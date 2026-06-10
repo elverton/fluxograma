@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Construtor de Fluxogramas — Algoritmos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --accent:#B0322F;        /* vermelho UFSJ */
+    --accent-deep:#7d201e;
+    --ink:#23201d;
+    --ink-soft:#5b554e;
+    --paper:#f4f0e9;
+    --paper-2:#fbf9f4;
+    --line:#d9d2c6;
+    --grid:#e7e0d4;
+    --ok:#3a7d44;
+    --warn:#b8860b;
+
+    /* paleta de blocos */
+    --term-fill:#fbeeda;  --term-stroke:#c79a52;
+    --proc-fill:#e9eef6;  --proc-stroke:#5a7bb0;
+    --io-fill:#eaf3ea;    --io-stroke:#5a8f63;
+    --dec-fill:#f6e8ea;   --dec-stroke:#b0322f;
+    --conn-fill:#ece6da;  --conn-stroke:#7c756a;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{
+    font-family:"IBM Plex Sans",sans-serif;
+    color:var(--ink);
+    background:var(--paper);
+    overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* ---------- Cabeçalho ---------- */
+  header{
+    display:flex;align-items:center;gap:18px;
+    padding:12px 22px;
+    background:var(--paper-2);
+    border-bottom:1px solid var(--line);
+    box-shadow:0 1px 0 rgba(0,0,0,.02);
+    position:relative;z-index:30;
+  }
+  .brand{display:flex;align-items:center;gap:14px;min-width:0}
+  .mark{
+    width:34px;height:34px;border-radius:7px;background:var(--accent);
+    display:grid;place-items:center;flex:0 0 auto;
+    box-shadow:0 2px 6px rgba(176,50,47,.3);
+  }
+  .mark svg{display:block}
+  .titles h1{
+    font-family:"Fraunces",serif;font-weight:600;font-size:20px;margin:0;line-height:1.05;
+    letter-spacing:-.01em;
+  }
+  .titles p{margin:1px 0 0;font-size:12px;color:var(--ink-soft);letter-spacing:.02em}
+
+  .controls{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+  button.ctrl{
+    font-family:"IBM Plex Sans",sans-serif;font-weight:500;font-size:13px;
+    border:1px solid var(--line);background:var(--paper-2);color:var(--ink);
+    padding:8px 13px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;
+    transition:transform .08s ease,background .15s ease,border-color .15s ease,box-shadow .15s;
+  }
+  button.ctrl:hover{background:#fff;border-color:#c8c0b2}
+  button.ctrl:active{transform:translateY(1px)}
+  button.ctrl svg{display:block}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 2px 8px rgba(176,50,47,.28)}
+  button.primary:hover{background:var(--accent-deep);border-color:var(--accent-deep)}
+  button.primary:disabled{opacity:.45;cursor:default;box-shadow:none}
+  button.ghost{background:transparent;border-color:transparent;color:var(--ink-soft)}
+  button.ghost:hover{background:rgba(0,0,0,.04);color:var(--ink)}
+  .speed{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-soft);
+    border:1px solid var(--line);border-radius:8px;padding:5px 10px;background:var(--paper-2)}
+  .speed input{accent-color:var(--accent);width:84px}
+
+  /* ---------- Layout ---------- */
+  .app{display:grid;grid-template-columns:208px 1fr 300px;height:calc(100% - 59px)}
+
+  /* ---------- Paleta ---------- */
+  aside.palette{
+    background:var(--paper-2);border-right:1px solid var(--line);
+    padding:16px 14px;overflow:auto;
+  }
+  .palette h2,.panel h2{
+    font-family:"IBM Plex Sans",sans-serif;font-size:11px;font-weight:600;text-transform:uppercase;
+    letter-spacing:.14em;color:var(--ink-soft);margin:0 0 12px;
+  }
+  .tile{
+    display:flex;align-items:center;gap:11px;padding:9px 11px;margin-bottom:9px;
+    border:1px solid var(--line);border-radius:10px;background:#fff;cursor:grab;
+    user-select:none;transition:transform .08s,box-shadow .15s,border-color .15s;touch-action:none;
+  }
+  .tile:hover{box-shadow:0 4px 12px rgba(0,0,0,.06);border-color:#cfc7b8;transform:translateY(-1px)}
+  .tile:active{cursor:grabbing}
+  .tile .ico{width:40px;height:28px;flex:0 0 auto;display:grid;place-items:center}
+  .tile .lab{font-size:12.5px;font-weight:500;line-height:1.15}
+  .tile .lab small{display:block;color:var(--ink-soft);font-weight:400;font-size:11px;margin-top:1px}
+
+  .hint{margin-top:6px;font-size:11.5px;color:var(--ink-soft);line-height:1.5;
+    background:#fff;border:1px dashed var(--line);border-radius:10px;padding:10px 11px}
+  .hint b{color:var(--ink)}
+
+  /* mini ícones de forma na paleta */
+  .sh{width:36px;height:24px;position:relative}
+  .sh.term{border-radius:30px;border:2px solid var(--term-stroke);background:var(--term-fill)}
+  .sh.proc{border:2px solid var(--proc-stroke);background:var(--proc-fill)}
+  .sh.io{background:var(--io-stroke);clip-path:polygon(22% 0,100% 0,78% 100%,0 100%)}
+  .sh.io::after{content:"";position:absolute;inset:2px;background:var(--io-fill);clip-path:polygon(22% 0,100% 0,78% 100%,0 100%)}
+  .sh.dec{background:var(--dec-stroke);clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}
+  .sh.dec::after{content:"";position:absolute;inset:2px;background:var(--dec-fill);clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}
+  .sh.conn{width:22px;height:22px;border-radius:50%;border:2.5px solid var(--conn-stroke);background:var(--conn-fill);align-self:center}
+
+  /* ---------- Canvas ---------- */
+  .stage{position:relative;overflow:auto;background:
+    radial-gradient(var(--grid) 1.2px, transparent 1.2px);
+    background-size:22px 22px;background-color:var(--paper);
+  }
+  .content{position:relative;width:3200px;height:2200px}
+  svg.wires{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+  svg.wires path.wire{fill:none;stroke:#8d8579;stroke-width:2;cursor:pointer;pointer-events:stroke}
+  svg.wires path.wire:hover{stroke:var(--accent)}
+  svg.wires path.wire.sel{stroke:var(--accent);stroke-width:3}
+  svg.wires path.wire.lit{stroke:var(--accent);stroke-width:3.5;filter:drop-shadow(0 0 4px rgba(176,50,47,.6))}
+  svg.wires text.brlab{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:600;fill:var(--ink-soft);
+    paint-order:stroke;stroke:var(--paper);stroke-width:4px;pointer-events:none}
+  svg.wires path.temp{fill:none;stroke:var(--accent);stroke-width:2.4;stroke-dasharray:6 5}
+
+  /* ---------- Blocos ---------- */
+  .block{position:absolute;display:flex;flex-direction:column;align-items:center;
+    cursor:grab;user-select:none;touch-action:none;z-index:5;transition:filter .15s}
+  .block:active{cursor:grabbing}
+  .block.selected{filter:drop-shadow(0 0 1px var(--accent)) drop-shadow(0 0 7px rgba(176,50,47,.55));z-index:8}
+  .block.active{filter:drop-shadow(0 0 2px var(--accent-deep)) drop-shadow(0 0 14px rgba(176,50,47,.85));z-index:9}
+  @keyframes pop{0%{transform:scale(.7);opacity:0}60%{transform:scale(1.05)}100%{transform:scale(1);opacity:1}}
+  .block.pop{animation:pop .26s cubic-bezier(.2,.9,.3,1.2)}
+  @keyframes beat{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+  .block.active .shape{animation:beat .7s ease-in-out infinite}
+
+  .shape{position:relative;display:grid;place-items:center;text-align:center;
+    min-width:108px;min-height:46px;padding:8px 14px}
+  .block.terminal .shape{border-radius:999px;border:2px solid var(--term-stroke);background:var(--term-fill);min-width:96px}
+  .block.process  .shape{border:2px solid var(--proc-stroke);background:var(--proc-fill);border-radius:3px}
+  .block.io .shape{background:var(--io-stroke);clip-path:polygon(15% 0,100% 0,85% 100%,0 100%);padding:8px 26px}
+  .block.io .shape::before{content:"";position:absolute;inset:2px;background:var(--io-fill);clip-path:polygon(15% 0,100% 0,85% 100%,0 100%)}
+  .block.decision .shape{background:var(--dec-stroke);clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);min-width:150px;min-height:96px;padding:0}
+  .block.decision .shape::before{content:"";position:absolute;inset:2px;background:var(--dec-fill);clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}
+  .block.connector .shape{width:30px;height:30px;min-width:0;min-height:0;padding:0;border-radius:50%;
+    border:2.5px solid var(--conn-stroke);background:var(--conn-fill)}
+
+  .content-wrap{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:3px}
+  .tag{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:600;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--ink-soft);opacity:.8}
+  .block.decision .content-wrap{max-width:104px}
+  .edit{
+    font-family:"IBM Plex Mono",monospace;font-size:13px;font-weight:500;color:var(--ink);
+    border:none;background:transparent;text-align:center;outline:none;min-width:40px;width:80px;
+    padding:1px 2px;border-radius:4px;
+  }
+  .edit:focus{background:rgba(255,255,255,.65);box-shadow:0 0 0 1.5px var(--accent)}
+  .block.terminal .edit{font-family:"IBM Plex Sans",sans-serif;font-weight:600;width:64px}
+
+  /* portas */
+  .port{position:absolute;width:13px;height:13px;border-radius:50%;background:#fff;
+    border:2.5px solid var(--ink-soft);cursor:crosshair;z-index:10;transition:transform .12s,background .12s,border-color .12s}
+  .port:hover{transform:scale(1.35);border-color:var(--accent);background:var(--accent)}
+  .port.ptop{top:-7px;left:50%;transform:translateX(-50%)}
+  .port.ptop:hover{transform:translateX(-50%) scale(1.35)}
+  .port.pbottom{bottom:-7px;left:50%;transform:translateX(-50%)}
+  .port.pbottom:hover{transform:translateX(-50%) scale(1.35)}
+  .port.pright,.port.ptrue{top:50%;right:-7px;transform:translateY(-50%)}
+  .port.pright:hover,.port.ptrue:hover{transform:translateY(-50%) scale(1.35)}
+  .port.pleft,.port.pfalse{top:50%;left:-7px;transform:translateY(-50%)}
+  .port.pleft:hover,.port.pfalse:hover{transform:translateY(-50%) scale(1.35)}
+  .plabel{position:absolute;font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:600;color:var(--ink-soft);pointer-events:none}
+  .plabel.t{top:50%;right:-26px;transform:translateY(-50%)}
+  .plabel.f{top:50%;left:-26px;transform:translateY(-50%)}
+
+  .del{position:absolute;top:-9px;right:-9px;width:20px;height:20px;border-radius:50%;
+    border:1.5px solid var(--accent);background:#fff;color:var(--accent);font-size:13px;line-height:1;
+    cursor:pointer;display:none;place-items:center;z-index:11;padding:0}
+  .block.selected .del{display:grid}
+  .del:hover{background:var(--accent);color:#fff}
+
+  /* preview ao arrastar da paleta */
+  .ghost{position:fixed;z-index:999;pointer-events:none;opacity:.85;transform:translate(-50%,-50%)}
+
+  /* ---------- Painel direito ---------- */
+  .panel{background:var(--paper-2);border-left:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden}
+  .panel .sec{padding:15px 16px;border-bottom:1px solid var(--line)}
+  .panel .sec.grow{flex:1;display:flex;flex-direction:column;overflow:hidden}
+  .status{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-soft)}
+  .dot{width:9px;height:9px;border-radius:50%;background:#bdb6a8}
+  .dot.run{background:var(--ok);box-shadow:0 0 0 3px rgba(58,125,68,.18)}
+  .dot.err{background:var(--accent)}
+  .dot.wait{background:var(--warn);animation:blink 1s infinite}
+  @keyframes blink{50%{opacity:.3}}
+
+  .vars{display:flex;flex-wrap:wrap;gap:7px;min-height:20px}
+  .chip{font-family:"IBM Plex Mono",monospace;font-size:12.5px;background:#fff;border:1px solid var(--line);
+    border-radius:7px;padding:4px 9px}
+  .chip b{color:var(--accent);font-weight:600}
+  .chip.fresh{animation:chipin .35s ease}
+  @keyframes chipin{from{background:#fdeede;transform:scale(.9)}to{background:#fff;transform:scale(1)}}
+  .empty{font-size:12px;color:#a59d8e;font-style:italic}
+
+  .console{flex:1;overflow:auto;font-family:"IBM Plex Mono",monospace;font-size:12.5px;
+    background:#fff;color:#3a352e;border:1px solid var(--line);border-radius:9px;padding:11px 12px;line-height:1.6;white-space:pre-wrap;
+    box-shadow:inset 0 1px 3px rgba(0,0,0,.04)}
+  .console .out{display:block;background:#fff4d4;color:#6b4e12;font-weight:600;font-size:14px;
+    border-left:4px solid var(--accent);padding:4px 10px;margin:5px 0;border-radius:5px;
+    box-shadow:0 1px 3px rgba(176,50,47,.10)}
+  .console .sys{color:#948f82}
+  .console .err{color:var(--accent);font-weight:500}
+  .console .ok{color:#2f8f44;font-weight:500}
+  .console .ln{display:block;padding:1px 0}
+
+  /* ---------- Modal de entrada ---------- */
+  .overlay{position:fixed;inset:0;background:rgba(35,32,29,.45);backdrop-filter:blur(2px);
+    display:none;place-items:center;z-index:200}
+  .overlay.show{display:grid}
+  .modal{background:var(--paper-2);border-radius:16px;padding:24px 26px;width:340px;max-width:90vw;
+    box-shadow:0 24px 60px rgba(0,0,0,.3);border:1px solid var(--line);animation:pop .25s ease}
+  .modal h3{font-family:"Fraunces",serif;font-weight:600;margin:0 0 4px;font-size:19px}
+  .modal p{margin:0 0 16px;font-size:13px;color:var(--ink-soft)}
+  .modal .ask{font-family:"IBM Plex Mono",monospace;font-size:15px;margin-bottom:8px}
+  .modal .ask b{color:var(--accent)}
+  .modal input{width:100%;font-family:"IBM Plex Mono",monospace;font-size:18px;padding:11px 14px;
+    border:1.5px solid var(--line);border-radius:10px;outline:none;background:#fff}
+  .modal input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(176,50,47,.13)}
+  .modal .merr{color:var(--accent);font-size:12px;min-height:16px;margin-top:6px}
+  .modal .row{display:flex;justify-content:flex-end;margin-top:8px}
+
+  @media(max-width:900px){
+    .app{grid-template-columns:1fr;grid-template-rows:auto 1fr auto}
+    aside.palette{display:flex;gap:8px;overflow-x:auto;padding:10px;border-right:none;border-bottom:1px solid var(--line)}
+    .palette h2,.hint{display:none}
+    .tile{margin:0;flex:0 0 auto}
+    .panel{flex-direction:row;border-left:none;border-top:1px solid var(--line);max-height:230px}
+    .panel .sec{flex:1;border-bottom:none;border-right:1px solid var(--line)}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="mark" title="Dcomp · UFSJ">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="9" y="2.5" width="6" height="5" rx="1.2"/><rect x="3.5" y="16.5" width="6" height="5" rx="1.2"/>
+        <rect x="14.5" y="16.5" width="6" height="5" rx="1.2"/><path d="M12 7.5v4M12 11.5H6.5v5M12 11.5h5.5v5"/>
+      </svg>
+    </div>
+    <div class="titles">
+      <h1>Construtor de Fluxogramas</h1>
+      <p>Algoritmos · Dcomp/UFSJ — arraste, conecte e execute</p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="speed" title="Velocidade da execução">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h7l-1 8 10-12h-7z"/></svg>
+      <input id="speed" type="range" min="150" max="1600" value="750" step="50">
+    </div>
+    <button class="ctrl ghost" id="btnEx2" title="Carregar exemplo com condição">Exemplo: maior</button>
+    <button class="ctrl ghost" id="btnEx3" title="Carregar exemplo com laço de repetição">Exemplo: laço</button>
+    <button class="ctrl ghost" id="btnClear">Limpar</button>
+    <button class="ctrl" id="btnStop" disabled>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg> Parar
+    </button>
+    <button class="ctrl primary" id="btnRun">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z"/></svg> Executar
+    </button>
+  </div>
+</header>
+
+<div class="app">
+  <!-- PALETA -->
+  <aside class="palette">
+    <h2>Blocos</h2>
+    <div class="tile" data-type="terminal" data-text="Início"><div class="ico"><div class="sh term"></div></div><div class="lab">Início<small>começo do fluxo</small></div></div>
+    <div class="tile" data-type="terminal" data-text="Fim"><div class="ico"><div class="sh term"></div></div><div class="lab">Fim<small>encerra o fluxo</small></div></div>
+    <div class="tile" data-type="io" data-text="A, B"><div class="ico"><div class="sh io"></div></div><div class="lab">Ler<small>entrada de dados</small></div></div>
+    <div class="tile" data-type="process" data-text="S = A + B"><div class="ico"><div class="sh proc"></div></div><div class="lab">Processo<small>atribuição / cálculo</small></div></div>
+    <div class="tile" data-type="output" data-text="S"><div class="ico"><div class="sh io"></div></div><div class="lab">Escrever<small>saída / imprimir</small></div></div>
+    <div class="tile" data-type="decision" data-text="A &gt; B"><div class="ico"><div class="sh dec"></div></div><div class="lab">Condição<small>Sim / Não</small></div></div>
+    <div class="tile" data-type="connector" data-text=""><div class="ico"><div class="sh conn"></div></div><div class="lab">Conector<small>junta o fluxo (repetição)</small></div></div>
+
+    <div class="hint">
+      <b>Como usar</b><br>
+      • Arraste um bloco da paleta para a área.<br>
+      • Mova blocos arrastando-os.<br>
+      • Puxe um fio a partir da <b>bolinha</b> de baixo (ou das laterais, na condição) até outro bloco.<br>
+      • Clique no texto para editar.<br>
+      • Use o <b>conector</b> (círculo) para juntar setas e criar repetições (laços).<br>
+      • Selecione e aperte <b>Delete</b> para apagar.
+    </div>
+  </aside>
+
+  <!-- CANVAS -->
+  <div class="stage" id="stage">
+    <div class="content" id="content">
+      <svg class="wires" id="wires">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0 L10 5 L0 10 z" fill="#8d8579"/>
+          </marker>
+          <marker id="arrowlit" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0 L10 5 L0 10 z" fill="#B0322F"/>
+          </marker>
+        </defs>
+      </svg>
+    </div>
+  </div>
+
+  <!-- PAINEL -->
+  <div class="panel">
+    <div class="sec">
+      <h2>Estado</h2>
+      <div class="status"><span class="dot" id="dot"></span><span id="statusTxt">Pronto para executar</span></div>
+    </div>
+    <div class="sec">
+      <h2>Variáveis</h2>
+      <div class="vars" id="vars"><span class="empty">nenhuma ainda</span></div>
+    </div>
+    <div class="sec grow">
+      <h2>Console / Saída</h2>
+      <div class="console" id="console"><span class="ln sys">› Monte o fluxograma e clique em Executar.</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DE ENTRADA -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h3>Leitura de dado</h3>
+    <p>O fluxograma chegou em um bloco de entrada.</p>
+    <div class="ask">Informe o valor de <b id="askVar">x</b>:</div>
+    <input id="askInput" type="text" autocomplete="off" placeholder="ex.: 3  (ou 3,5)">
+    <div class="merr" id="askErr"></div>
+    <div class="row"><button class="ctrl primary" id="askOk">Confirmar</button></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+   Construtor de Fluxogramas — núcleo
+   ============================================================ */
+const content = document.getElementById('content');
+const stage   = document.getElementById('stage');
+const wires   = document.getElementById('wires');
+const consoleEl = document.getElementById('console');
+const varsEl  = document.getElementById('vars');
+const dot     = document.getElementById('dot');
+const statusTxt = document.getElementById('statusTxt');
+
+let blocks = {};        // id -> {id,type,x,y,text}
+let conns  = [];        // {id,from,port,to}   port: 'out'|'true'|'false'
+let blockEls = {};      // id -> DOM
+let idc = 0;
+let selected = null;    // {kind:'block'|'wire', id}
+let running = false;
+let stopFlag = false;
+
+const TYPE = {
+  terminal:{cls:'terminal'}, io:{cls:'io'}, process:{cls:'process'},
+  output:{cls:'io'}, decision:{cls:'decision'}, connector:{cls:'connector'}
+};
+const uid = p => p+(++idc);
+
+/* ---------- criação de blocos ---------- */
+function addBlock(type, x, y, text, id){
+  id = id || uid('b');
+  blocks[id] = {id, type, x, y, text:text??''};
+  renderBlock(id, true);
+  return id;
+}
+
+function renderBlock(id, animate){
+  const b = blocks[id];
+  let el = blockEls[id];
+  if(!el){
+    el = document.createElement('div');
+    el.className = 'block '+TYPE[b.type].cls;
+    el.dataset.id = id;
+    blockEls[id] = el;
+    content.appendChild(el);
+
+    // estrutura interna
+    if(b.type === 'connector'){
+      el.innerHTML = `<div class="shape"></div>`;
+    } else {
+      const tagText = {io:'LER', output:'ESCREVER', process:'', terminal:'', decision:'SE'}[b.type];
+      el.innerHTML =
+        `<div class="shape"><div class="content-wrap">
+           ${tagText?`<span class="tag">${tagText}</span>`:''}
+           <input class="edit" spellcheck="false">
+         </div></div>`;
+    }
+
+    const input = el.querySelector('.edit');
+    if(input){
+      input.value = b.text;
+      autosize(input);
+      input.addEventListener('input', ()=>{ b.text = input.value; autosize(input); });
+      // editar sem disparar arraste/conexão
+      input.addEventListener('pointerdown', e=> e.stopPropagation());
+    }
+
+    // portas
+    if(b.type === 'decision'){
+      el.insertAdjacentHTML('beforeend',
+        `<div class="port ptrue" data-port="true"></div><span class="plabel t">SIM</span>
+         <div class="port pfalse" data-port="false"></div><span class="plabel f">NÃO</span>`);
+    } else {
+      // Demais blocos: pontos de conexão nos quatro lados (saída única)
+      el.insertAdjacentHTML('beforeend',
+        `<div class="port ptop"    data-port="top"></div>
+         <div class="port pright"  data-port="right"></div>
+         <div class="port pbottom" data-port="bottom"></div>
+         <div class="port pleft"   data-port="left"></div>`);
+    }
+    el.insertAdjacentHTML('beforeend', `<button class="del" title="Apagar">×</button>`);
+
+    el.querySelector('.del').addEventListener('pointerdown', e=>{ e.stopPropagation(); deleteBlock(id); });
+    el.querySelectorAll('.port').forEach(p=>{
+      p.addEventListener('pointerdown', e=> startWire(e, id, p.dataset.port));
+    });
+    el.addEventListener('pointerdown', e=> startMove(e, id));
+  }
+  el.style.left = b.x+'px';
+  el.style.top  = b.y+'px';
+  if(animate){ el.classList.add('pop'); setTimeout(()=>el.classList.remove('pop'),300); }
+}
+
+function autosize(input){
+  input.style.width = '10px';
+  input.style.width = Math.min(220, Math.max(40, input.scrollWidth+6))+'px';
+}
+
+function deleteBlock(id){
+  conns = conns.filter(c=> c.from!==id && c.to!==id);
+  blockEls[id]?.remove();
+  delete blockEls[id]; delete blocks[id];
+  selected = null;
+  redraw();
+}
+
+/* ============================================================
+   Interação por ponteiro (mover / conectar / criar)
+   ============================================================ */
+let mode = 'idle';   // idle | move | wire | create
+let drag = null;
+
+function contentPoint(e){
+  const r = content.getBoundingClientRect();
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
+
+/* mover bloco */
+function startMove(e, id){
+  if(running) return;
+  if(e.target.classList.contains('port') || e.target.classList.contains('edit') || e.target.classList.contains('del')) return;
+  e.preventDefault();
+  select('block', id);
+  const p = contentPoint(e);
+  mode = 'move';
+  drag = { id, dx: p.x - blocks[id].x, dy: p.y - blocks[id].y };
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp);
+}
+
+/* puxar fio */
+let tempPath = null;
+function startWire(e, id, port){
+  if(running) return;
+  e.preventDefault(); e.stopPropagation();
+  mode = 'wire';
+  drag = { id, port };
+  tempPath = mk('path'); tempPath.setAttribute('class','temp');
+  wires.appendChild(tempPath);
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp);
+}
+
+/* criar a partir da paleta */
+let ghost = null;
+function startCreate(e, type, text){
+  if(running) return;
+  e.preventDefault();
+  mode = 'create';
+  drag = { type, text };
+  ghost = document.createElement('div');
+  ghost.className = 'ghost block '+TYPE[type].cls;
+  if(type === 'connector'){
+    ghost.innerHTML = `<div class="shape"></div>`;
+  } else {
+    const tagText = {io:'LER', output:'ESCREVER', decision:'SE'}[type] || '';
+    ghost.innerHTML = `<div class="shape"><div class="content-wrap">${tagText?`<span class="tag">${tagText}</span>`:''}<span class="edit">${escapeHTML(text)}</span></div></div>`;
+  }
+  document.body.appendChild(ghost);
+  moveGhost(e);
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp);
+}
+function moveGhost(e){ ghost.style.left = e.clientX+'px'; ghost.style.top = e.clientY+'px'; }
+
+function onMove(e){
+  if(mode === 'move'){
+    const p = contentPoint(e);
+    const b = blocks[drag.id];
+    b.x = Math.max(0, p.x - drag.dx);
+    b.y = Math.max(0, p.y - drag.dy);
+    blockEls[drag.id].style.left = b.x+'px';
+    blockEls[drag.id].style.top  = b.y+'px';
+    redraw();
+  } else if(mode === 'wire'){
+    const from = anchorOf(drag.id, drag.port);
+    const p = contentPoint(e);
+    tempPath.setAttribute('d', `M${from.x},${from.y} L${p.x},${p.y}`);
+  } else if(mode === 'create'){
+    moveGhost(e);
+  }
+}
+
+function onUp(e){
+  window.removeEventListener('pointermove', onMove);
+  window.removeEventListener('pointerup', onUp);
+
+  if(mode === 'wire'){
+    tempPath?.remove(); tempPath = null;
+    const target = blockUnder(e.clientX, e.clientY);
+    if(target && target !== drag.id) connect(drag.id, drag.port, target);
+    redraw();
+  } else if(mode === 'create'){
+    const r = stage.getBoundingClientRect();
+    const inside = e.clientX>=r.left && e.clientX<=r.right && e.clientY>=r.top && e.clientY<=r.bottom;
+    ghost?.remove(); ghost = null;
+    if(inside){
+      const p = contentPoint(e);
+      addBlock(drag.type, p.x-55, p.y-25, drag.text);
+    }
+  }
+  mode = 'idle'; drag = null;
+}
+
+function blockUnder(cx, cy){
+  const el = document.elementFromPoint(cx, cy)?.closest('.block');
+  return el ? el.dataset.id : null;
+}
+
+/* ---------- conexões ---------- */
+const isBranch = p => p==='true' || p==='false';
+function connect(from, port, to){
+  const b = blocks[from];
+  if(b && b.type==='decision'){
+    // cada ramo (SIM/NÃO) tem seu próprio fio
+    conns = conns.filter(c=> !(c.from===from && c.port===port));
+  } else {
+    // saída única: remove qualquer saída anterior, de qualquer lado
+    conns = conns.filter(c=> !(c.from===from && !isBranch(c.port)));
+  }
+  conns.push({ id:uid('c'), from, port, to });
+}
+
+/* ============================================================
+   Desenho dos fios (SVG)
+   ============================================================ */
+function mk(tag){ return document.createElementNS('http://www.w3.org/2000/svg', tag); }
+
+function blockRect(id){
+  const el = blockEls[id];
+  const c = content.getBoundingClientRect();
+  const b = el.getBoundingClientRect();
+  return { x: b.left-c.left, y: b.top-c.top, w: b.width, h: b.height };
+}
+function anchorOf(id, port){
+  const r = blockRect(id);
+  if(port==='true'  || port==='right') return { x:r.x+r.w,   y:r.y+r.h/2 };
+  if(port==='false' || port==='left')  return { x:r.x,       y:r.y+r.h/2 };
+  if(port==='top')                     return { x:r.x+r.w/2, y:r.y };
+  // 'bottom' e 'out' (legado dos exemplos)
+  return { x:r.x+r.w/2, y:r.y+r.h };
+}
+function borderPoint(r, fx, fy){
+  const cx=r.x+r.w/2, cy=r.y+r.h/2, dx=fx-cx, dy=fy-cy;
+  if(!dx && !dy) return {x:cx,y:cy};
+  const s = 1/Math.max(Math.abs(dx)/(r.w/2), Math.abs(dy)/(r.h/2));
+  return { x: cx+dx*s, y: cy+dy*s };
+}
+
+let litWire = null;
+function redraw(){
+  // remove fios antigos (mantém <defs>)
+  wires.querySelectorAll('path.wire, text.brlab').forEach(n=>n.remove());
+  for(const c of conns){
+    if(!blocks[c.from] || !blocks[c.to]) continue;
+    const a = anchorOf(c.from, c.port);
+    const tr = blockRect(c.to);
+    const b = borderPoint(tr, a.x, a.y);
+    const path = mk('path');
+    let cls = 'wire';
+    if(selected?.kind==='wire' && selected.id===c.id) cls+=' sel';
+    if(litWire===c.id) cls+=' lit';
+    path.setAttribute('class', cls);
+    path.setAttribute('d', `M${a.x},${a.y} L${b.x},${b.y}`);
+    path.setAttribute('marker-end', litWire===c.id ? 'url(#arrowlit)' : 'url(#arrow)');
+    path.addEventListener('pointerdown', e=>{ e.stopPropagation(); select('wire', c.id); });
+    wires.appendChild(path);
+
+    if(c.port==='true' || c.port==='false'){
+      const t = mk('text'); t.setAttribute('class','brlab');
+      t.setAttribute('x', a.x + (c.port==='true'? 7 : -7));
+      t.setAttribute('y', a.y - 6);
+      if(c.port==='false') t.setAttribute('text-anchor','end');
+      t.textContent = c.port==='true' ? 'SIM' : 'NÃO';
+      wires.appendChild(t);
+    }
+  }
+}
+
+/* ---------- seleção ---------- */
+function select(kind, id){
+  if(selected?.kind==='block') blockEls[selected.id]?.classList.remove('selected');
+  selected = {kind, id};
+  if(kind==='block') blockEls[id]?.classList.add('selected');
+  redraw();
+}
+function clearSelection(){
+  if(selected?.kind==='block') blockEls[selected.id]?.classList.remove('selected');
+  selected = null; redraw();
+}
+stage.addEventListener('pointerdown', e=>{ if(e.target===stage || e.target===content || e.target===wires) clearSelection(); });
+window.addEventListener('keydown', e=>{
+  if(running) return;
+  if((e.key==='Delete'||e.key==='Backspace') && selected && document.activeElement.tagName!=='INPUT'){
+    e.preventDefault();
+    if(selected.kind==='block') deleteBlock(selected.id);
+    else { conns = conns.filter(c=>c.id!==selected.id); selected=null; redraw(); }
+  }
+});
+
+/* paleta -> arrastar para criar */
+document.querySelectorAll('.tile').forEach(t=>{
+  t.addEventListener('pointerdown', e=> startCreate(e, t.dataset.type, t.dataset.text));
+});
+
+/* ============================================================
+   Avaliador de expressões (sem eval)
+   ============================================================ */
+function tokenize(src){
+  const toks=[]; let i=0;
+  const isd=c=>/[0-9]/.test(c), isa=c=>/[A-Za-zÀ-ÿ_]/.test(c), isw=c=>/[A-Za-zÀ-ÿ0-9_]/.test(c);
+  while(i<src.length){
+    const c=src[i];
+    if(/\s/.test(c)){i++;continue;}
+    if(isd(c) || (c==='.'&&isd(src[i+1]))){
+      let j=i; while(j<src.length && /[0-9.]/.test(src[j])) j++;
+      toks.push({t:'num', v:parseFloat(src.slice(i,j))}); i=j; continue;
+    }
+    if(isa(c)){
+      let j=i; while(j<src.length && isw(src[j])) j++;
+      let w=src.slice(i,j); const lw=w.toLowerCase(); i=j;
+      if(lw==='e') toks.push({t:'op',v:'&&'});
+      else if(lw==='ou') toks.push({t:'op',v:'||'});
+      else if(lw==='nao'||lw==='não') toks.push({t:'op',v:'!'});
+      else if(lw==='verdadeiro') toks.push({t:'num',v:1});
+      else if(lw==='falso') toks.push({t:'num',v:0});
+      else toks.push({t:'id', v:w});
+      continue;
+    }
+    const two=src.substr(i,2);
+    if(['==','!=','<=','>=','&&','||'].includes(two)){ toks.push({t:'op',v:two}); i+=2; continue; }
+    if('+-*/%()<>!'.includes(c)){ toks.push({t:'op',v:c}); i++; continue; }
+    throw new Error(`símbolo inesperado “${c}”`);
+  }
+  return toks;
+}
+
+function evalExpr(src, vars){
+  const toks = tokenize(src);
+  let pos=0;
+  const peek=()=>toks[pos], eat=v=>{ if(toks[pos]&&toks[pos].v===v){pos++;return true;} return false; };
+  const num=x=> (x===true?1:x===false?0:x);
+
+  function parseOr(){ let l=parseAnd(); while(peek()&&peek().v==='||'){pos++; const r=parseAnd(); l=(truthy(l)||truthy(r));} return l; }
+  function parseAnd(){ let l=parseEq(); while(peek()&&peek().v==='&&'){pos++; const r=parseEq(); l=(truthy(l)&&truthy(r));} return l; }
+  function parseEq(){ let l=parseCmp(); while(peek()&&(peek().v==='=='||peek().v==='!=')){const o=peek().v;pos++; const r=parseCmp(); l=(o==='=='? num(l)===num(r): num(l)!==num(r));} return l; }
+  function parseCmp(){ let l=parseAdd(); while(peek()&&['<','>','<=','>='].includes(peek().v)){const o=peek().v;pos++; const r=parseAdd(); const a=num(l),b=num(r); l=(o==='<'?a<b:o==='>'?a>b:o==='<='?a<=b:a>=b);} return l; }
+  function parseAdd(){ let l=parseMul(); while(peek()&&(peek().v==='+'||peek().v==='-')){const o=peek().v;pos++; const r=parseMul(); l=(o==='+'?num(l)+num(r):num(l)-num(r));} return l; }
+  function parseMul(){ let l=parseUn(); while(peek()&&['*','/','%'].includes(peek().v)){const o=peek().v;pos++; const r=parseUn(); const a=num(l),b=num(r); if((o==='/'||o==='%')&&b===0) throw new Error('divisão por zero'); l=(o==='*'?a*b:o==='/'?a/b:a%b);} return l; }
+  function parseUn(){ if(eat('-')) return -num(parseUn()); if(eat('!')) return !truthy(parseUn()); return parsePrim(); }
+  function parsePrim(){
+    const tk=peek();
+    if(!tk) throw new Error('expressão incompleta');
+    if(tk.t==='num'){pos++; return tk.v;}
+    if(tk.t==='id'){
+      pos++;
+      if(!(tk.v in vars)) throw new Error(`variável “${tk.v}” ainda não tem valor`);
+      return vars[tk.v];
+    }
+    if(eat('(')){ const v=parseOr(); if(!eat(')')) throw new Error('faltou fechar “)”'); return v; }
+    throw new Error(`não entendi “${tk.v}”`);
+  }
+  const r = parseOr();
+  if(pos < toks.length) throw new Error(`sobrou “${toks[pos].v}” na expressão`);
+  return r;
+}
+function truthy(x){ return x===true || (typeof x==='number' && x!==0); }
+function fmt(n){
+  if(typeof n==='boolean') return n?'verdadeiro':'falso';
+  if(typeof n!=='number') return String(n);
+  if(Number.isInteger(n)) return String(n);
+  return String(Math.round(n*1e6)/1e6);
+}
+
+/* ============================================================
+   EXECUÇÃO
+   ============================================================ */
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+const speed = () => 1750 - +document.getElementById('speed').value;
+
+function log(text, cls=''){ const s=document.createElement('span'); s.className='ln '+cls; s.textContent=text; consoleEl.appendChild(s); consoleEl.scrollTop=consoleEl.scrollHeight; }
+function setStatus(text, kind=''){ statusTxt.textContent=text; dot.className='dot '+kind; }
+let vstate = {};
+function renderVars(fresh){
+  varsEl.innerHTML='';
+  const keys=Object.keys(vstate);
+  if(!keys.length){ varsEl.innerHTML='<span class="empty">nenhuma ainda</span>'; return; }
+  for(const k of keys){
+    const c=document.createElement('span'); c.className='chip'+(fresh===k?' fresh':'');
+    c.innerHTML=`<b>${escapeHTML(k)}</b> = ${escapeHTML(fmt(vstate[k]))}`;
+    varsEl.appendChild(c);
+  }
+}
+function escapeHTML(s){ return String(s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
+
+function nextConn(id, port){ return conns.find(c=> c.from===id && c.port===port); }
+function outConn(id){ return conns.find(c=> c.from===id && c.port!=='true' && c.port!=='false'); }
+function highlight(id){
+  Object.values(blockEls).forEach(el=>el.classList.remove('active'));
+  if(id) blockEls[id]?.classList.add('active');
+}
+
+async function run(){
+  // validação
+  const starts = Object.values(blocks).filter(b=> b.type==='terminal' && /in[ií]cio/i.test(b.text.trim()));
+  const allTerms = Object.values(blocks).filter(b=> b.type==='terminal');
+  let start;
+  if(starts.length===1) start = starts[0];
+  else if(allTerms.length){ start = allTerms.find(b=> !conns.some(c=>c.to===b.id)) || allTerms[0]; }
+  if(!start){ flashError('Adicione um bloco de Início ao fluxograma.'); return; }
+
+  // preparar UI
+  running=true; stopFlag=false; clearSelection();
+  document.getElementById('btnRun').disabled=true;
+  document.getElementById('btnStop').disabled=false;
+  consoleEl.innerHTML=''; vstate={}; renderVars();
+  log('› Iniciando execução…','sys');
+  setStatus('Executando…','run');
+
+  let cur = start.id, steps=0;
+  try{
+    while(cur){
+      if(stopFlag) throw {stopped:true};
+      if(++steps>5000) throw new Error('o fluxograma rodou demais — verifique se há um laço sem fim.');
+      const b = blocks[cur];
+      highlight(cur);
+      await sleep(speed());
+      if(stopFlag) throw {stopped:true};
+
+      if(b.type==='terminal'){
+        if(/fim/i.test(b.text)){ log('› Fim.','ok'); break; }
+        // início -> segue
+        cur = step(cur, b); continue;
+      }
+      if(b.type==='connector'){     // junção: apenas repassa o fluxo
+        cur = step(cur, b); continue;
+      }
+      if(b.type==='io'){            // LER
+        const names = parseVars(b.text);
+        if(!names.length) throw new Error('o bloco de leitura está vazio (ex.: A, B).');
+        for(const nm of names){
+          if(stopFlag) throw {stopped:true};
+          setStatus('Aguardando entrada…','wait');
+          const val = await askValue(nm);
+          if(val===null) throw {stopped:true};
+          vstate[nm]=val; renderVars(nm);
+          log(`  entrada: ${nm} = ${fmt(val)}`,'sys');
+          setStatus('Executando…','run');
+        }
+        cur = step(cur, b); continue;
+      }
+      if(b.type==='process'){       // atribuição
+        const m = b.text.match(/^\s*([A-Za-zÀ-ÿ_][\wÀ-ÿ]*)\s*=\s*([^=].*)$/);
+        if(!m) throw new Error(`bloco de processo inválido: “${b.text}”. Use o formato  variável = expressão.`);
+        const v = evalExpr(m[2], vstate);
+        vstate[m[1].trim()] = v; renderVars(m[1].trim());
+        log(`  ${m[1].trim()} ← ${fmt(v)}`,'sys');
+        cur = step(cur, b); continue;
+      }
+      if(b.type==='output'){        // ESCREVER
+        const parts = splitTop(b.text);
+        const vals = parts.map(p=> fmt(evalExpr(p, vstate)));
+        log('  '+vals.join(' '),'out');
+        cur = step(cur, b); continue;
+      }
+      if(b.type==='decision'){      // SE
+        const cond = truthy(evalExpr(b.text, vstate));
+        log(`  ${b.text.trim()}  →  ${cond?'SIM':'NÃO'}`, cond?'ok':'err');
+        const port = cond?'true':'false';
+        const c = nextConn(cur, port);
+        if(!c) throw new Error(`a condição deu ${cond?'SIM':'NÃO'}, mas não há saída “${cond?'SIM':'NÃO'}” conectada.`);
+        litWire=c.id; redraw(); await sleep(speed()*0.6); litWire=null; redraw();
+        cur = c.to; continue;
+      }
+      throw new Error('bloco desconhecido.');
+    }
+    finishOK();
+  }catch(err){
+    if(err && err.stopped){ log('› Execução interrompida.','sys'); setStatus('Parado','err'); }
+    else { log('✗ Erro: '+(err.message||err),'err'); setStatus('Erro na execução','err'); }
+  }finally{
+    highlight(null);
+    running=false; litWire=null; redraw();
+    document.getElementById('btnRun').disabled=false;
+    document.getElementById('btnStop').disabled=true;
+  }
+}
+
+function step(cur, b){
+  const c = outConn(cur);
+  if(!c) throw new Error(`o bloco “${b.text||b.type}” não tem uma seta de saída conectada.`);
+  litWire=c.id; redraw();
+  setTimeout(()=>{ litWire=null; redraw(); }, speed()*0.6);
+  return c.to;
+}
+function finishOK(){ if(!stopFlag){ log('✓ Execução concluída.','ok'); setStatus('Concluído','run'); setTimeout(()=>{ if(!running) setStatus('Pronto para executar',''); },1200);} }
+function flashError(msg){ consoleEl.innerHTML=''; log('✗ '+msg,'err'); setStatus('Verifique o fluxograma','err'); }
+
+function parseVars(text){
+  return text.replace(/^\s*(ler|leia|receb\w*)\s*:?\s*/i,'')
+             .split(',').map(s=>s.trim()).filter(Boolean)
+             .filter(s=>/^[A-Za-zÀ-ÿ_][\wÀ-ÿ]*$/.test(s));
+}
+/* separa por vírgula no nível superior (fora de parênteses) */
+function splitTop(text){
+  const out=[]; let d=0, cur='';
+  for(const ch of text){ if(ch==='(')d++; if(ch===')')d--; if(ch===','&&d===0){out.push(cur);cur='';} else cur+=ch; }
+  if(cur.trim())out.push(cur);
+  return out.map(s=>s.trim()).filter(Boolean);
+}
+
+/* ---------- modal de entrada ---------- */
+const overlay=document.getElementById('overlay');
+const askInput=document.getElementById('askInput');
+const askErr=document.getElementById('askErr');
+function askValue(name){
+  return new Promise(resolve=>{
+    document.getElementById('askVar').textContent=name;
+    askInput.value=''; askErr.textContent='';
+    overlay.classList.add('show'); setTimeout(()=>askInput.focus(),50);
+    function done(){
+      const raw=askInput.value.trim().replace(',','.');
+      if(raw===''){ askErr.textContent='Digite um número.'; return; }
+      const v=Number(raw);
+      if(Number.isNaN(v)){ askErr.textContent='Valor inválido — informe um número.'; return; }
+      cleanup(); resolve(v);
+    }
+    function cancel(){ cleanup(); resolve(null); }
+    function key(e){ if(e.key==='Enter')done(); if(e.key==='Escape')cancel(); }
+    function cleanup(){ overlay.classList.remove('show'); ok.removeEventListener('click',done); askInput.removeEventListener('keydown',key); }
+    const ok=document.getElementById('askOk');
+    ok.addEventListener('click',done); askInput.addEventListener('keydown',key);
+  });
+}
+
+/* ============================================================
+   Botões + exemplos
+   ============================================================ */
+document.getElementById('btnRun').addEventListener('click', run);
+document.getElementById('btnStop').addEventListener('click', ()=>{ stopFlag=true; overlay.classList.remove('show'); });
+document.getElementById('btnClear').addEventListener('click', ()=>{
+  if(running) return;
+  if(!confirm('Limpar todo o fluxograma?')) return;
+  Object.values(blockEls).forEach(e=>e.remove());
+  blocks={}; conns=[]; blockEls={}; selected=null; redraw();
+  consoleEl.innerHTML='<span class="ln sys">› Tela limpa. Arraste blocos para começar.</span>';
+  varsEl.innerHTML='<span class="empty">nenhuma ainda</span>'; setStatus('Pronto para executar','');
+});
+
+function resetCanvas(){ Object.values(blockEls).forEach(e=>e.remove()); blocks={}; conns=[]; blockEls={}; selected=null; idc=0; }
+
+/* Exemplo 1 (do slide): soma de dois valores */
+function loadSum(){
+  resetCanvas();
+  const i =addBlock('terminal',520,60,'Início');
+  const r =addBlock('io',505,170,'A, B');
+  const p =addBlock('process',500,280,'S = A + B');
+  const o =addBlock('output',505,390,'S');
+  const f =addBlock('terminal',525,500,'Fim');
+  conns=[
+    {id:uid('c'),from:i,port:'out',to:r},
+    {id:uid('c'),from:r,port:'out',to:p},
+    {id:uid('c'),from:p,port:'out',to:o},
+    {id:uid('c'),from:o,port:'out',to:f},
+  ];
+  redraw();
+}
+/* Exemplo 2: maior de dois números (condição) */
+function loadMax(){
+  resetCanvas();
+  const i =addBlock('terminal',560,50,'Início');
+  const r =addBlock('io',545,160,'A, B');
+  const d =addBlock('decision',540,275,'A > B');
+  const oa=addBlock('output',330,300,'A');
+  const ob=addBlock('output',790,300,'B');
+  const f =addBlock('terminal',565,470,'Fim');
+  conns=[
+    {id:uid('c'),from:i,port:'out',to:r},
+    {id:uid('c'),from:r,port:'out',to:d},
+    {id:uid('c'),from:d,port:'false',to:oa}, // NÃO (esquerda) -> imprime A
+    {id:uid('c'),from:d,port:'true', to:ob}, // SIM (direita) -> imprime B
+    {id:uid('c'),from:oa,port:'out',to:f},
+    {id:uid('c'),from:ob,port:'out',to:f},
+  ];
+  // ajusta: se A>B (SIM) deve imprimir A. Corrigindo a semântica:
+  conns.find(c=>c.from===d&&c.port==='true').to = oa;
+  conns.find(c=>c.from===d&&c.port==='false').to = ob;
+  redraw();
+  consoleEl.innerHTML='<span class="ln sys">› Exemplo “maior de dois números” carregado. Clique em Executar.</span>';
+}
+document.getElementById('btnEx2').addEventListener('click', ()=>{ if(!running) loadMax(); });
+
+/* Exemplo 3: laço — imprime de 1 até N (conector fecha a repetição) */
+function loadLoop(){
+  resetCanvas();
+  const i  = addBlock('terminal',600,40,'Início');
+  const r  = addBlock('io',590,150,'N');
+  const p1 = addBlock('process',575,255,'i = 1');
+  const j  = addBlock('connector',648,358,'');
+  const d  = addBlock('decision',560,435,'i <= N');
+  const pr = addBlock('output',840,468,'i');
+  const inc= addBlock('process',815,575,'i = i + 1');
+  const f  = addBlock('terminal',600,470,'Fim');
+  conns=[
+    {id:uid('c'),from:i, port:'out',  to:r},
+    {id:uid('c'),from:r, port:'out',  to:p1},
+    {id:uid('c'),from:p1,port:'out',  to:j},
+    {id:uid('c'),from:j, port:'out',  to:d},
+    {id:uid('c'),from:d, port:'true', to:pr},   // SIM: imprime i
+    {id:uid('c'),from:pr,port:'out',  to:inc},  // incrementa
+    {id:uid('c'),from:inc,port:'out', to:j},    // volta ao conector (repete)
+    {id:uid('c'),from:d, port:'false',to:f},    // NÃO: termina
+  ];
+  redraw();
+  consoleEl.innerHTML='<span class="ln sys">› Exemplo de laço: lê N e imprime de 1 até N. O conector fecha a repetição. Clique em Executar.</span>';
+}
+document.getElementById('btnEx3').addEventListener('click', ()=>{ if(!running) loadLoop(); });
+
+/* redesenha ao rolar/redimensionar (coordenadas absolutas não mudam, mas garante atualização) */
+window.addEventListener('resize', redraw);
+
+/* inicializa com o exemplo do slide */
+loadSum();
+log('› Exemplo do slide carregado: recebe A e B e imprime a soma. Clique em Executar!','sys');
+</script>
+</body>
+</html>
