@@ -35,6 +35,8 @@
     background:var(--paper);
     overflow:hidden;
     -webkit-font-smoothing:antialiased;
+    display:flex;flex-direction:column;
+    height:100dvh;
   }
 
   /* ---------- Cabeçalho ---------- */
@@ -79,7 +81,7 @@
   .speed input{accent-color:var(--accent);width:84px}
 
   /* ---------- Layout ---------- */
-  .app{display:grid;grid-template-columns:208px 1fr 300px;height:calc(100% - 59px)}
+  .app{display:grid;grid-template-columns:208px 1fr 300px;flex:1;min-height:0}
 
   /* ---------- Paleta ---------- */
   aside.palette{
@@ -166,7 +168,10 @@
 
   /* portas */
   .port{position:absolute;width:13px;height:13px;border-radius:50%;background:#fff;
-    border:2.5px solid var(--ink-soft);cursor:crosshair;z-index:10;transition:transform .12s,background .12s,border-color .12s}
+    border:2.5px solid var(--ink-soft);cursor:crosshair;z-index:10;transition:transform .12s,background .12s,border-color .12s;
+    touch-action:none}
+  .port::before{content:"";position:absolute;inset:-9px;border-radius:50%}
+  .del{touch-action:none}
   .port:hover{transform:scale(1.35);border-color:var(--accent);background:var(--accent)}
   .port.ptop{top:-7px;left:50%;transform:translateX(-50%)}
   .port.ptop:hover{transform:translateX(-50%) scale(1.35)}
@@ -235,13 +240,61 @@
   .modal .merr{color:var(--accent);font-size:12px;min-height:16px;margin-top:6px}
   .modal .row{display:flex;justify-content:flex-end;margin-top:8px}
 
+  /* abas do painel (apenas mobile) */
+  .ptabs{display:none}
+
+  /* alvos de toque maiores em telas de toque */
+  @media(pointer:coarse){
+    .port{width:20px;height:20px;border-width:3px}
+    .port::before{inset:-12px}
+    .port.ptop{top:-11px}.port.pbottom{bottom:-11px}
+    .port.pright,.port.ptrue{right:-11px}
+    .port.pleft,.port.pfalse{left:-11px}
+    .del{width:26px;height:26px;font-size:16px;top:-12px;right:-12px}
+    .block{-webkit-touch-callout:none}
+    .block .edit{touch-action:none}
+  }
+
   @media(max-width:900px){
-    .app{grid-template-columns:1fr;grid-template-rows:auto 1fr auto}
-    aside.palette{display:flex;gap:8px;overflow-x:auto;padding:10px;border-right:none;border-bottom:1px solid var(--line)}
+    header{padding:8px 12px;gap:10px}
+    .titles h1{font-size:16px}
+    .titles p{display:none}
+    .mark{width:28px;height:28px}
+    .speed{display:none}
+    button.ctrl{padding:7px 11px;font-size:12.5px}
+
+    .app{display:flex;flex-direction:column}
+
+    aside.palette{
+      display:flex;gap:8px;overflow-x:auto;overflow-y:hidden;
+      padding:8px 10px;border-right:none;border-bottom:1px solid var(--line);
+      flex:0 0 auto;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;
+    }
     .palette h2,.hint{display:none}
-    .tile{margin:0;flex:0 0 auto}
-    .panel{flex-direction:row;border-left:none;border-top:1px solid var(--line);max-height:230px}
-    .panel .sec{flex:1;border-bottom:none;border-right:1px solid var(--line)}
+    .tile{margin:0;flex:0 0 auto;touch-action:pan-x;padding:7px 10px}
+    .tile .lab small{display:none}
+
+    .stage{flex:1;min-height:0;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+
+    .panel{
+      flex:0 0 auto;border-left:none;border-top:1px solid var(--line);
+      height:32dvh;min-height:170px;
+    }
+    .ptabs{
+      display:flex;align-items:center;gap:4px;padding:6px 8px 0;
+    }
+    .ptab{
+      font-family:"IBM Plex Sans",sans-serif;font-size:12px;font-weight:600;
+      border:1px solid var(--line);border-bottom:none;background:transparent;color:var(--ink-soft);
+      padding:7px 13px;border-radius:9px 9px 0 0;cursor:pointer;
+    }
+    .ptab.on{background:#fff;color:var(--ink);border-color:#cfc7b8}
+    .ptabs .status{margin-left:auto;font-size:11.5px;padding-right:4px}
+    .panel .sec{display:none;border-bottom:none}
+    .panel .sec.grow{padding:8px 10px 10px}
+    .panel .sec.show{display:flex;flex-direction:column;flex:1;min-height:0;overflow:auto}
+    .panel .sec h2{display:none}
+    .vars{align-content:flex-start}
   }
 </style>
 </head>
@@ -319,15 +372,20 @@
 
   <!-- PAINEL -->
   <div class="panel">
-    <div class="sec">
+    <div class="ptabs">
+      <button class="ptab on" data-tab="console">Console</button>
+      <button class="ptab" data-tab="vars">Variáveis</button>
+      <div class="status"><span class="dot" id="dotM"></span><span id="statusTxtM">Pronto</span></div>
+    </div>
+    <div class="sec" id="secStatus">
       <h2>Estado</h2>
       <div class="status"><span class="dot" id="dot"></span><span id="statusTxt">Pronto para executar</span></div>
     </div>
-    <div class="sec">
+    <div class="sec" id="secVars" data-pane="vars">
       <h2>Variáveis</h2>
       <div class="vars" id="vars"><span class="empty">nenhuma ainda</span></div>
     </div>
-    <div class="sec grow">
+    <div class="sec grow show" id="secConsole" data-pane="console">
       <h2>Console / Saída</h2>
       <div class="console" id="console"><span class="ln sys">› Monte o fluxograma e clique em Executar.</span></div>
     </div>
@@ -340,7 +398,7 @@
     <h3>Leitura de dado</h3>
     <p>O fluxograma chegou em um bloco de entrada.</p>
     <div class="ask">Informe o valor de <b id="askVar">x</b>:</div>
-    <input id="askInput" type="text" autocomplete="off" placeholder="ex.: 3  (ou 3,5)">
+    <input id="askInput" type="text" inputmode="decimal" autocomplete="off" placeholder="ex.: 3  (ou 3,5)">
     <div class="merr" id="askErr"></div>
     <div class="row"><button class="ctrl primary" id="askOk">Confirmar</button></div>
   </div>
@@ -409,7 +467,12 @@ function renderBlock(id, animate){
       autosize(input);
       input.addEventListener('input', ()=>{ b.text = input.value; autosize(input); });
       // editar sem disparar arraste/conexão
-      input.addEventListener('pointerdown', e=> e.stopPropagation());
+      input.addEventListener('pointerdown', e=>{
+        // toque: deixa o gesto com o bloco (arrastar), exceto se já estiver editando;
+        // mouse: comportamento normal de clique para editar
+        if(e.pointerType === 'touch' && document.activeElement !== input) return;
+        e.stopPropagation();
+      });
     }
 
     // portas
@@ -465,14 +528,22 @@ function contentPoint(e){
 /* mover bloco */
 function startMove(e, id){
   if(running) return;
-  if(e.target.classList.contains('port') || e.target.classList.contains('edit') || e.target.classList.contains('del')) return;
+  if(e.target.classList.contains('port') || e.target.classList.contains('del')) return;
+  const isEdit = e.target.classList.contains('edit');
+  // mouse: clicar no texto edita normalmente (não inicia arraste)
+  if(isEdit && e.pointerType !== 'touch') return;
+  // toque no texto: segura o foco — arrastou? move o bloco; tocou? edita (no onUp)
   e.preventDefault();
+  e.target.setPointerCapture?.(e.pointerId);
   select('block', id);
   const p = contentPoint(e);
   mode = 'move';
-  drag = { id, dx: p.x - blocks[id].x, dy: p.y - blocks[id].y };
+  drag = { id, dx: p.x - blocks[id].x, dy: p.y - blocks[id].y,
+           sx: e.clientX, sy: e.clientY, moved: false,
+           editTarget: isEdit ? e.target : null };
   window.addEventListener('pointermove', onMove);
   window.addEventListener('pointerup', onUp);
+  window.addEventListener('pointercancel', onCancel);
 }
 
 /* puxar fio */
@@ -480,21 +551,28 @@ let tempPath = null;
 function startWire(e, id, port){
   if(running) return;
   e.preventDefault(); e.stopPropagation();
+  e.target.setPointerCapture?.(e.pointerId);
   mode = 'wire';
   drag = { id, port };
   tempPath = mk('path'); tempPath.setAttribute('class','temp');
   wires.appendChild(tempPath);
   window.addEventListener('pointermove', onMove);
   window.addEventListener('pointerup', onUp);
+  window.addEventListener('pointercancel', onCancel);
 }
 
-/* criar a partir da paleta */
+/* criar a partir da paleta
+   — arrastar: cria onde soltar; toque rápido: adiciona no centro da área visível */
 let ghost = null;
 function startCreate(e, type, text){
   if(running) return;
-  e.preventDefault();
   mode = 'create';
-  drag = { type, text };
+  drag = { type, text, sx:e.clientX, sy:e.clientY, started:false };
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp);
+  window.addEventListener('pointercancel', onCancel);
+}
+function beginGhost(e, type, text){
   ghost = document.createElement('div');
   ghost.className = 'ghost block '+TYPE[type].cls;
   if(type === 'connector'){
@@ -505,13 +583,32 @@ function startCreate(e, type, text){
   }
   document.body.appendChild(ghost);
   moveGhost(e);
-  window.addEventListener('pointermove', onMove);
-  window.addEventListener('pointerup', onUp);
+}
+function addAtCenter(type, text){
+  const id = addBlock(type,
+    stage.scrollLeft + stage.clientWidth/2 - 55,
+    stage.scrollTop  + stage.clientHeight/2 - 25, text);
+  select('block', id);
 }
 function moveGhost(e){ ghost.style.left = e.clientX+'px'; ghost.style.top = e.clientY+'px'; }
 
+function onCancel(){
+  // o navegador assumiu o gesto (ex.: rolagem da paleta) — aborta sem criar
+  window.removeEventListener('pointermove', onMove);
+  window.removeEventListener('pointerup', onUp);
+  window.removeEventListener('pointercancel', onCancel);
+  ghost?.remove(); ghost=null;
+  tempPath?.remove(); tempPath=null;
+  mode='idle'; drag=null;
+}
+
 function onMove(e){
   if(mode === 'move'){
+    if(!drag.moved){
+      if(Math.hypot(e.clientX-drag.sx, e.clientY-drag.sy) < 6) return;
+      drag.moved = true;
+    }
+    edgeScroll(e);
     const p = contentPoint(e);
     const b = blocks[drag.id];
     b.x = Math.max(0, p.x - drag.dx);
@@ -520,30 +617,57 @@ function onMove(e){
     blockEls[drag.id].style.top  = b.y+'px';
     redraw();
   } else if(mode === 'wire'){
+    edgeScroll(e);
     const from = anchorOf(drag.id, drag.port);
     const p = contentPoint(e);
     tempPath.setAttribute('d', `M${from.x},${from.y} L${p.x},${p.y}`);
   } else if(mode === 'create'){
+    if(!drag.started){
+      if(Math.hypot(e.clientX-drag.sx, e.clientY-drag.sy) < 8) return;
+      drag.started = true;
+      beginGhost(e, drag.type, drag.text);
+    }
     moveGhost(e);
   }
+}
+
+/* rola a área quando se arrasta perto da borda (essencial no celular) */
+function edgeScroll(e){
+  const r = stage.getBoundingClientRect(), m = 42, v = 14;
+  if(e.clientX < r.left + m)  stage.scrollLeft -= v;
+  if(e.clientX > r.right - m) stage.scrollLeft += v;
+  if(e.clientY < r.top + m)   stage.scrollTop  -= v;
+  if(e.clientY > r.bottom - m)stage.scrollTop  += v;
 }
 
 function onUp(e){
   window.removeEventListener('pointermove', onMove);
   window.removeEventListener('pointerup', onUp);
+  window.removeEventListener('pointercancel', onCancel);
 
-  if(mode === 'wire'){
+  if(mode === 'move'){
+    if(!drag.moved && drag.editTarget){
+      // foi um toque, não um arraste → abre a edição do texto
+      const t = drag.editTarget;
+      setTimeout(()=>{ t.focus(); t.select?.(); }, 0);
+    }
+  } else if(mode === 'wire'){
     tempPath?.remove(); tempPath = null;
     const target = blockUnder(e.clientX, e.clientY);
     if(target && target !== drag.id) connect(drag.id, drag.port, target);
     redraw();
   } else if(mode === 'create'){
-    const r = stage.getBoundingClientRect();
-    const inside = e.clientX>=r.left && e.clientX<=r.right && e.clientY>=r.top && e.clientY<=r.bottom;
-    ghost?.remove(); ghost = null;
-    if(inside){
-      const p = contentPoint(e);
-      addBlock(drag.type, p.x-55, p.y-25, drag.text);
+    if(!drag.started){
+      // toque/clique simples na paleta → adiciona no centro da área visível
+      addAtCenter(drag.type, drag.text);
+    } else {
+      const r = stage.getBoundingClientRect();
+      const inside = e.clientX>=r.left && e.clientX<=r.right && e.clientY>=r.top && e.clientY<=r.bottom;
+      ghost?.remove(); ghost = null;
+      if(inside){
+        const p = contentPoint(e);
+        addBlock(drag.type, p.x-55, p.y-25, drag.text);
+      }
     }
   }
   mode = 'idle'; drag = null;
@@ -726,7 +850,11 @@ const sleep = ms => new Promise(r=>setTimeout(r,ms));
 const speed = () => 1750 - +document.getElementById('speed').value;
 
 function log(text, cls=''){ const s=document.createElement('span'); s.className='ln '+cls; s.textContent=text; consoleEl.appendChild(s); consoleEl.scrollTop=consoleEl.scrollHeight; }
-function setStatus(text, kind=''){ statusTxt.textContent=text; dot.className='dot '+kind; }
+function setStatus(text, kind=''){
+  statusTxt.textContent=text; dot.className='dot '+kind;
+  const dM=document.getElementById('dotM'), sM=document.getElementById('statusTxtM');
+  if(dM){ dM.className='dot '+kind; sM.textContent=text; }
+}
 let vstate = {};
 function renderVars(fresh){
   varsEl.innerHTML='';
@@ -744,7 +872,11 @@ function nextConn(id, port){ return conns.find(c=> c.from===id && c.port===port)
 function outConn(id){ return conns.find(c=> c.from===id && c.port!=='true' && c.port!=='false'); }
 function highlight(id){
   Object.values(blockEls).forEach(el=>el.classList.remove('active'));
-  if(id) blockEls[id]?.classList.add('active');
+  if(id){
+    const el = blockEls[id];
+    el?.classList.add('active');
+    el?.scrollIntoView({behavior:'smooth', block:'center', inline:'center'});
+  }
 }
 
 async function run(){
@@ -883,9 +1015,16 @@ function askValue(name){
 /* ============================================================
    Botões + exemplos
    ============================================================ */
-document.getElementById('btnRun').addEventListener('click', run);
+/* abas do painel (mobile) */
+function showPane(name){
+  document.querySelectorAll('.ptab').forEach(t=> t.classList.toggle('on', t.dataset.tab===name));
+  document.querySelectorAll('.panel .sec[data-pane]').forEach(sec=> sec.classList.toggle('show', sec.dataset.pane===name));
+}
+document.querySelectorAll('.ptab').forEach(t=> t.addEventListener('click', ()=> showPane(t.dataset.tab)));
+
+document.getElementById('btnRun').addEventListener('click', ()=>{ showPane('console'); run(); });
 document.getElementById('btnStop').addEventListener('click', ()=>{ stopFlag=true; overlay.classList.remove('show'); });
-document.getElementById('btnClear').addEventListener('click', ()=>{
+document.getElementById('btnClear')?.addEventListener('click', ()=>{
   if(running) return;
   if(!confirm('Limpar todo o fluxograma?')) return;
   Object.values(blockEls).forEach(e=>e.remove());
@@ -935,7 +1074,7 @@ function loadMax(){
   redraw();
   consoleEl.innerHTML='<span class="ln sys">› Exemplo “maior de dois números” carregado. Clique em Executar.</span>';
 }
-document.getElementById('btnEx2').addEventListener('click', ()=>{ if(!running) loadMax(); });
+document.getElementById('btnEx2')?.addEventListener('click', ()=>{ if(!running) loadMax(); });
 
 /* Exemplo 3: laço — imprime de 1 até N (conector fecha a repetição) */
 function loadLoop(){
@@ -961,7 +1100,7 @@ function loadLoop(){
   redraw();
   consoleEl.innerHTML='<span class="ln sys">› Exemplo de laço: lê N e imprime de 1 até N. O conector fecha a repetição. Clique em Executar.</span>';
 }
-document.getElementById('btnEx3').addEventListener('click', ()=>{ if(!running) loadLoop(); });
+document.getElementById('btnEx3')?.addEventListener('click', ()=>{ if(!running) loadLoop(); });
 
 /* redesenha ao rolar/redimensionar (coordenadas absolutas não mudam, mas garante atualização) */
 window.addEventListener('resize', redraw);
