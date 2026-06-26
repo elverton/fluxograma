@@ -151,7 +151,7 @@
   .block.io .shape::before{content:"";position:absolute;inset:2px;background:var(--io-fill);clip-path:polygon(15% 0,100% 0,85% 100%,0 100%)}
   .block.decision .shape{background:var(--dec-stroke);clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);min-width:150px;min-height:96px;padding:0}
   .block.decision .shape::before{content:"";position:absolute;inset:2px;background:var(--dec-fill);clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}
-  .block.connector .shape{width:30px;height:30px;min-width:0;min-height:0;padding:0;border-radius:50%;
+  .block.connector .shape{width:46px;height:46px;min-width:0;min-height:0;padding:0;border-radius:50%;
     border:2.5px solid var(--conn-stroke);background:var(--conn-fill)}
 
   .content-wrap{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:3px}
@@ -320,8 +320,10 @@
       <input id="speed" type="range" min="150" max="1600" value="750" step="50">
     </div>
     <!-- <button class="ctrl ghost" id="btnEx2" title="Carregar exemplo com condição">Exemplo: maior</button>
-    <button class="ctrl ghost" id="btnEx3" title="Carregar exemplo com laço de repetição">Exemplo: laço</button>  -->
-    <button class="ctrl" id="btnClear">Limpar</button>
+    <button class="ctrl ghost" id="btnEx3" title="Carregar exemplo com laço de repetição">Exemplo: laço</button> -->
+    <button class="ctrl ghost" id="btnClear" title="Apagar todo o fluxograma">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V6"/><path d="M10 11v6M14 11v6"/></svg> Limpar
+    </button>
     <button class="ctrl" id="btnStop" disabled>
       <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg> Parar
     </button>
