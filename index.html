@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Construtor de Fluxogramas — Algoritmos</title>
+<title>Construtor de Fluxogramas - Algoritmos</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -141,6 +141,8 @@
   @keyframes pop{0%{transform:scale(.7);opacity:0}60%{transform:scale(1.05)}100%{transform:scale(1);opacity:1}}
   .block.pop{animation:pop .26s cubic-bezier(.2,.9,.3,1.2)}
   @keyframes beat{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+  body.paused .block.active .shape{animation-play-state:paused}
+  body.paused svg.wires path.lit{filter:none}
   .block.active .shape{animation:beat .7s ease-in-out infinite}
 
   .shape{position:relative;display:grid;place-items:center;text-align:center;
@@ -151,7 +153,7 @@
   .block.io .shape::before{content:"";position:absolute;inset:2px;background:var(--io-fill);clip-path:polygon(15% 0,100% 0,85% 100%,0 100%)}
   .block.decision .shape{background:var(--dec-stroke);clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);min-width:150px;min-height:96px;padding:0}
   .block.decision .shape::before{content:"";position:absolute;inset:2px;background:var(--dec-fill);clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}
-  .block.connector .shape{width:46px;height:46px;min-width:0;min-height:0;padding:0;border-radius:50%;
+  .block.connector .shape{width:30px;height:30px;min-width:0;min-height:0;padding:0;border-radius:50%;
     border:2.5px solid var(--conn-stroke);background:var(--conn-fill)}
 
   .content-wrap{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:3px}
@@ -320,8 +322,11 @@
       <input id="speed" type="range" min="150" max="1600" value="750" step="50">
     </div>
     <!-- <button class="ctrl ghost" id="btnEx2" title="Carregar exemplo com condição">Exemplo: maior</button>
-    <button class="ctrl ghost" id="btnEx3" title="Carregar exemplo com laço de repetição">Exemplo: laço</button> -->
-    <button class="ctrl" id="btnClear">Limpar</button>
+    <button class="ctrl ghost" id="btnEx3" title="Carregar exemplo com laço de repetição">Exemplo: laço</button>
+    <button class="ctrl ghost" id="btnClear">Limpar</button> -->
+    <button class="ctrl" id="btnPause" disabled>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg> <span>Pausar</span>
+    </button>
     <button class="ctrl" id="btnStop" disabled>
       <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg> Parar
     </button>
@@ -350,6 +355,7 @@
       • Puxe um fio a partir da <b>bolinha</b> de baixo (ou das laterais, na condição) até outro bloco.<br>
       • Clique no texto para editar.<br>
       • Use o <b>conector</b> (círculo) para juntar setas e criar repetições (laços).<br>
+      • No <b>escrever</b>, textos vão entre aspas: <b>"Resultado:", S</b>.<br>
       • Selecione e aperte <b>Delete</b> para apagar.
     </div>
   </aside>
@@ -761,7 +767,12 @@ function clearSelection(){
 }
 stage.addEventListener('pointerdown', e=>{ if(e.target===stage || e.target===content || e.target===wires) clearSelection(); });
 window.addEventListener('keydown', e=>{
-  if(running) return;
+  if(running){
+    if(e.key===' ' && document.activeElement.tagName!=='INPUT' && !overlay.classList.contains('show')){
+      e.preventDefault(); setPaused(!pauseFlag);
+    }
+    return;
+  }
   if((e.key==='Delete'||e.key==='Backspace') && selected && document.activeElement.tagName!=='INPUT'){
     e.preventDefault();
     if(selected.kind==='block') deleteBlock(selected.id);
@@ -783,6 +794,11 @@ function tokenize(src){
   while(i<src.length){
     const c=src[i];
     if(/\s/.test(c)){i++;continue;}
+    if(c==='"'){
+      const j=src.indexOf('"', i+1);
+      if(j===-1) throw new Error('texto sem fechar as aspas (")');
+      toks.push({t:'str', v:src.slice(i+1, j)}); i=j+1; continue;
+    }
     if(isd(c) || (c==='.'&&isd(src[i+1]))){
       let j=i; while(j<src.length && /[0-9.]/.test(src[j])) j++;
       toks.push({t:'num', v:parseFloat(src.slice(i,j))}); i=j; continue;
@@ -814,15 +830,27 @@ function evalExpr(src, vars){
 
   function parseOr(){ let l=parseAnd(); while(peek()&&peek().v==='||'){pos++; const r=parseAnd(); l=(truthy(l)||truthy(r));} return l; }
   function parseAnd(){ let l=parseEq(); while(peek()&&peek().v==='&&'){pos++; const r=parseEq(); l=(truthy(l)&&truthy(r));} return l; }
-  function parseEq(){ let l=parseCmp(); while(peek()&&(peek().v==='=='||peek().v==='!=')){const o=peek().v;pos++; const r=parseCmp(); l=(o==='=='? num(l)===num(r): num(l)!==num(r));} return l; }
-  function parseCmp(){ let l=parseAdd(); while(peek()&&['<','>','<=','>='].includes(peek().v)){const o=peek().v;pos++; const r=parseAdd(); const a=num(l),b=num(r); l=(o==='<'?a<b:o==='>'?a>b:o==='<='?a<=b:a>=b);} return l; }
-  function parseAdd(){ let l=parseMul(); while(peek()&&(peek().v==='+'||peek().v==='-')){const o=peek().v;pos++; const r=parseMul(); l=(o==='+'?num(l)+num(r):num(l)-num(r));} return l; }
-  function parseMul(){ let l=parseUn(); while(peek()&&['*','/','%'].includes(peek().v)){const o=peek().v;pos++; const r=parseUn(); const a=num(l),b=num(r); if((o==='/'||o==='%')&&b===0) throw new Error('divisão por zero'); l=(o==='*'?a*b:o==='/'?a/b:a%b);} return l; }
-  function parseUn(){ if(eat('-')) return -num(parseUn()); if(eat('!')) return !truthy(parseUn()); return parsePrim(); }
+  function parseEq(){ let l=parseCmp(); while(peek()&&(peek().v==='=='||peek().v==='!=')){const o=peek().v;pos++; const r=parseCmp();
+    const eq = (typeof l==='string'||typeof r==='string') ? String(l)===String(r) : num(l)===num(r);
+    l=(o==='=='?eq:!eq);} return l; }
+  function parseCmp(){ let l=parseAdd(); while(peek()&&['<','>','<=','>='].includes(peek().v)){const o=peek().v;pos++; const r=parseAdd();
+    if(typeof l==='string'||typeof r==='string') throw new Error('não é possível comparar texto com < > <= >=');
+    const a=num(l),b=num(r); l=(o==='<'?a<b:o==='>'?a>b:o==='<='?a<=b:a>=b);} return l; }
+  function parseAdd(){ let l=parseMul(); while(peek()&&(peek().v==='+'||peek().v==='-')){const o=peek().v;pos++; const r=parseMul();
+    if(typeof l==='string'||typeof r==='string'){
+      if(o==='-') throw new Error('não é possível subtrair texto');
+      l=fmt(l)+fmt(r); continue;
+    }
+    l=(o==='+'?num(l)+num(r):num(l)-num(r));} return l; }
+  function parseMul(){ let l=parseUn(); while(peek()&&['*','/','%'].includes(peek().v)){const o=peek().v;pos++; const r=parseUn();
+    if(typeof l==='string'||typeof r==='string') throw new Error('não é possível fazer contas com texto');
+    const a=num(l),b=num(r); if((o==='/'||o==='%')&&b===0) throw new Error('divisão por zero'); l=(o==='*'?a*b:o==='/'?a/b:a%b);} return l; }
+  function parseUn(){ if(eat('-')){ const v=parseUn(); if(typeof v==='string') throw new Error('não é possível negativar texto'); return -num(v);} if(eat('!')) return !truthy(parseUn()); return parsePrim(); }
   function parsePrim(){
     const tk=peek();
     if(!tk) throw new Error('expressão incompleta');
     if(tk.t==='num'){pos++; return tk.v;}
+    if(tk.t==='str'){pos++; return tk.v;}
     if(tk.t==='id'){
       pos++;
       if(!(tk.v in vars)) throw new Error(`variável “${tk.v}” ainda não tem valor`);
@@ -848,6 +876,24 @@ function fmt(n){
    ============================================================ */
 const sleep = ms => new Promise(r=>setTimeout(r,ms));
 const speed = () => 1750 - +document.getElementById('speed').value;
+let pauseFlag = false;
+/* espera que respeita pausa (e sai imediatamente ao Parar) */
+async function pSleep(ms){
+  const chunk = 50; let t = 0;
+  while((t < ms || pauseFlag) && !stopFlag){
+    await sleep(chunk);
+    if(!pauseFlag) t += chunk;
+  }
+}
+function setPaused(on){
+  pauseFlag = on;
+  document.body.classList.toggle('paused', on);
+  const btn = document.getElementById('btnPause');
+  if(btn) btn.innerHTML = on
+    ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z"/></svg> <span>Continuar</span>'
+    : '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg> <span>Pausar</span>';
+  if(running) setStatus(on ? 'Pausado' : 'Executando…', on ? 'wait' : 'run');
+}
 
 function log(text, cls=''){ const s=document.createElement('span'); s.className='ln '+cls; s.textContent=text; consoleEl.appendChild(s); consoleEl.scrollTop=consoleEl.scrollHeight; }
 function setStatus(text, kind=''){
@@ -892,6 +938,7 @@ async function run(){
   running=true; stopFlag=false; clearSelection();
   document.getElementById('btnRun').disabled=true;
   document.getElementById('btnStop').disabled=false;
+  document.getElementById('btnPause').disabled=false; setPaused(false);
   consoleEl.innerHTML=''; vstate={}; renderVars();
   log('› Iniciando execução…','sys');
   setStatus('Executando…','run');
@@ -903,7 +950,7 @@ async function run(){
       if(++steps>5000) throw new Error('o fluxograma rodou demais — verifique se há um laço sem fim.');
       const b = blocks[cur];
       highlight(cur);
-      await sleep(speed());
+      await pSleep(speed());
       if(stopFlag) throw {stopped:true};
 
       if(b.type==='terminal'){
@@ -939,7 +986,7 @@ async function run(){
       if(b.type==='output'){        // ESCREVER
         const parts = splitTop(b.text);
         const vals = parts.map(p=> fmt(evalExpr(p, vstate)));
-        log('  '+vals.join(' '),'out');
+        log('  '+vals.join(''),'out');
         cur = step(cur, b); continue;
       }
       if(b.type==='decision'){      // SE
@@ -948,7 +995,7 @@ async function run(){
         const port = cond?'true':'false';
         const c = nextConn(cur, port);
         if(!c) throw new Error(`a condição deu ${cond?'SIM':'NÃO'}, mas não há saída “${cond?'SIM':'NÃO'}” conectada.`);
-        litWire=c.id; redraw(); await sleep(speed()*0.6); litWire=null; redraw();
+        litWire=c.id; redraw(); await pSleep(speed()*0.6); litWire=null; redraw();
         cur = c.to; continue;
       }
       throw new Error('bloco desconhecido.');
@@ -962,6 +1009,7 @@ async function run(){
     running=false; litWire=null; redraw();
     document.getElementById('btnRun').disabled=false;
     document.getElementById('btnStop').disabled=true;
+    document.getElementById('btnPause').disabled=true; setPaused(false);
   }
 }
 
@@ -980,10 +1028,14 @@ function parseVars(text){
              .split(',').map(s=>s.trim()).filter(Boolean)
              .filter(s=>/^[A-Za-zÀ-ÿ_][\wÀ-ÿ]*$/.test(s));
 }
-/* separa por vírgula no nível superior (fora de parênteses) */
+/* separa por vírgula no nível superior (fora de parênteses e de aspas) */
 function splitTop(text){
-  const out=[]; let d=0, cur='';
-  for(const ch of text){ if(ch==='(')d++; if(ch===')')d--; if(ch===','&&d===0){out.push(cur);cur='';} else cur+=ch; }
+  const out=[]; let d=0, q=false, cur='';
+  for(const ch of text){
+    if(ch==='"') q=!q;
+    if(!q){ if(ch==='(')d++; if(ch===')')d--; }
+    if(ch===','&&d===0&&!q){out.push(cur);cur='';} else cur+=ch;
+  }
   if(cur.trim())out.push(cur);
   return out.map(s=>s.trim()).filter(Boolean);
 }
@@ -1024,6 +1076,7 @@ document.querySelectorAll('.ptab').forEach(t=> t.addEventListener('click', ()=> 
 
 document.getElementById('btnRun').addEventListener('click', ()=>{ showPane('console'); run(); });
 document.getElementById('btnStop').addEventListener('click', ()=>{ stopFlag=true; overlay.classList.remove('show'); });
+document.getElementById('btnPause').addEventListener('click', ()=>{ if(running) setPaused(!pauseFlag); });
 document.getElementById('btnClear')?.addEventListener('click', ()=>{
   if(running) return;
   if(!confirm('Limpar todo o fluxograma?')) return;
@@ -1041,7 +1094,7 @@ function loadSum(){
   const i =addBlock('terminal',520,60,'Início');
   const r =addBlock('io',505,170,'A, B');
   const p =addBlock('process',500,280,'S = A + B');
-  const o =addBlock('output',505,390,'S');
+  const o =addBlock('output',505,390,'"Resultado: ", S');
   const f =addBlock('terminal',525,500,'Fim');
   conns=[
     {id:uid('c'),from:i,port:'out',to:r},
